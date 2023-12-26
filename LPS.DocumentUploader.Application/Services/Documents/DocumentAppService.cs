@@ -1,10 +1,13 @@
 ﻿using AutoMapper;
+using Azure.Core;
 using LPS.DocumentUploader.Application.Helpers;
 using LPS.DocumentUploader.Application.Services.Documents.Dto;
 using LPS.DocumentUploader.Application.Services.Notifications;
 using LPS.DocumentUploader.Database.Databases;
 using LPS.DocumentUploader.Database.Models;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.WebUtilities;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -29,7 +32,7 @@ namespace LPS.DocumentUploader.Application.Services.Documents
             _emailAppService = emailAppService;
         }
 
-        public async Task<string> UploadFile(DocumentDto documentDto, string userEmail)
+        public async Task<string> UploadFile(HttpContext httpContext, DocumentDto documentDto, string userEmail)
         {
             try
             {
@@ -38,7 +41,6 @@ namespace LPS.DocumentUploader.Application.Services.Documents
                     throw new ArgumentException("Invalid document");
                 }
 
-                // Check file extension
                 string[] allowedExtensions = { ".xlsx", ".pdf" };
                 string fileExtension = Path.GetExtension(documentDto.FileName).ToLower();
 
@@ -47,6 +49,8 @@ namespace LPS.DocumentUploader.Application.Services.Documents
                     throw new ArgumentException("Invalid file format. Supported formats: .xlsx, .pdf");
                 }
 
+                var fileDataStream = documentDto.FileData.OpenReadStream();
+                
                 string uploadsFolder = Path.Combine(_environment.ContentRootPath, "Uploads");
                 if (!Directory.Exists(uploadsFolder))
                 {
@@ -55,22 +59,27 @@ namespace LPS.DocumentUploader.Application.Services.Documents
 
                 string fileName = Guid.NewGuid().ToString() + "_" + documentDto.FileName;
                 string filePath = Path.Combine(uploadsFolder, fileName);
-
                 FileMode fileMode = documentDto.ChunkNumber == 1 ? FileMode.Create : FileMode.Append;
 
                 using (var stream = new FileStream(filePath, fileMode))
                 {
-                    await documentDto.FileData.CopyToAsync(stream);
+                    int chunkSize = documentDto.TotalChunks;
+                    var buffer = new byte[chunkSize];
+                    var bytesRead = 0;
+                    do
+                    {
+                        bytesRead = await fileDataStream.ReadAsync(buffer, 0, buffer.Length);
+                        await stream.WriteAsync(buffer, 0, bytesRead);
+                    } while (bytesRead > 0);
                 }
 
                 if (documentDto.ChunkNumber == documentDto.TotalChunks)
                 {
-                    await CompleteFile(documentDto.FileName, documentDto.TotalChunks);
                     await SaveToDatabase(documentDto);
                     await _emailAppService.SendEmailAsync(userEmail, "Document Uploaded", "Your document has been successfully uploaded.");
                 }
 
-                return filePath;
+                return fileName;
             }
             catch (Exception ex)
             {
@@ -102,38 +111,6 @@ namespace LPS.DocumentUploader.Application.Services.Documents
             catch (Exception outerEx)
             {
                 
-            }
-        }
-
-        private async Task CompleteFile(string fileName, int totalChunks)
-        {
-            try
-            {
-                string uploadsFolder = Path.Combine(_environment.ContentRootPath, "Uploads");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                string assembledFilePath = Path.Combine(uploadsFolder, fileName);
-
-                using (var assembledStream = new FileStream(assembledFilePath, FileMode.Create, FileAccess.Write))
-                {
-                    for (int chunkNumber = 1; chunkNumber <= totalChunks; chunkNumber++)
-                    {
-                        string chunkFilePath = Path.Combine(uploadsFolder, $"{fileName}_chunk_{chunkNumber}");
-
-                        using (var chunkStream = new FileStream(chunkFilePath, FileMode.Open, FileAccess.Read))
-                        {
-                            await chunkStream.CopyToAsync(assembledStream);
-                        }
-                        File.Delete(chunkFilePath);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to assemble file: {ex.Message}");
             }
         }
 

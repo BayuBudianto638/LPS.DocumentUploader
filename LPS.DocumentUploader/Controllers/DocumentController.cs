@@ -23,14 +23,16 @@ namespace LPS.DocumentUploader.Controllers
         }
 
         [HttpPost("UploadFile")]
-        [Authorize]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = long.MaxValue)]
+        [AllowAnonymous]
         public async Task<IActionResult> UploadFile([FromForm] DocumentViewModel model, string userEmail)
         {
             try
             {
                 var documentDto = _mapper.Map<DocumentDto>(model);
 
-                string filePath = await _documentAppService.UploadFile(documentDto, userEmail);
+                string filePath = await _documentAppService.UploadFile(HttpContext, documentDto, userEmail);
                 return Ok($"File uploaded successfully.");
             }
             catch (Exception ex)

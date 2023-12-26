@@ -7,6 +7,7 @@ using LPS.DocumentUploader.ConfigProfiles;
 using LPS.DocumentUploader.Database.Databases;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -50,7 +51,21 @@ builder.Services.AddSingleton<IEmailAppService>(new EmailAppService("smtp-server
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 2147483648; 
+    options.MultipartBodyLengthLimit = (long)(2 * System.Math.Pow(1024, 3));
+    options.MemoryBufferThreshold = Int32.MaxValue;
+    options.MultipartHeadersLengthLimit = Int32.MaxValue;
+    options.MultipartBoundaryLengthLimit = Int32.MaxValue;
+    options.MultipartHeadersCountLimit = Int32.MaxValue; 
+});
+
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = (long)(2 * System.Math.Pow(1024, 3));
+});
+
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = (long)(2 * System.Math.Pow(1024, 3));
 });
 
 builder.Services.AddControllers();
@@ -98,6 +113,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseRouting();
 
 app.UseHttpsRedirection();
 
