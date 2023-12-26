@@ -65,6 +65,7 @@ namespace LPS.DocumentUploader.Application.Services.Documents
 
                 if (documentDto.ChunkNumber == documentDto.TotalChunks)
                 {
+                    await CompleteFile(documentDto.FileName, documentDto.TotalChunks);
                     await SaveToDatabase(documentDto);
                     await _emailAppService.SendEmailAsync(userEmail, "Document Uploaded", "Your document has been successfully uploaded.");
                 }
@@ -101,6 +102,38 @@ namespace LPS.DocumentUploader.Application.Services.Documents
             catch (Exception outerEx)
             {
                 
+            }
+        }
+
+        private async Task CompleteFile(string fileName, int totalChunks)
+        {
+            try
+            {
+                string uploadsFolder = Path.Combine(_environment.ContentRootPath, "Uploads");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                string assembledFilePath = Path.Combine(uploadsFolder, fileName);
+
+                using (var assembledStream = new FileStream(assembledFilePath, FileMode.Create, FileAccess.Write))
+                {
+                    for (int chunkNumber = 1; chunkNumber <= totalChunks; chunkNumber++)
+                    {
+                        string chunkFilePath = Path.Combine(uploadsFolder, $"{fileName}_chunk_{chunkNumber}");
+
+                        using (var chunkStream = new FileStream(chunkFilePath, FileMode.Open, FileAccess.Read))
+                        {
+                            await chunkStream.CopyToAsync(assembledStream);
+                        }
+                        File.Delete(chunkFilePath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to assemble file: {ex.Message}");
             }
         }
 
