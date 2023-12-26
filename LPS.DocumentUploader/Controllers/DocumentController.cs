@@ -23,7 +23,7 @@ namespace LPS.DocumentUploader.Controllers
         }
 
         [HttpPost("UploadFile")]
-        [AllowAnonymous]
+        [Authorize]
         public async Task<IActionResult> UploadFile([FromForm] DocumentViewModel model, string userEmail)
         {
             try
