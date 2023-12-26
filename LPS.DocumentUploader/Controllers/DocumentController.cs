@@ -31,7 +31,7 @@ namespace LPS.DocumentUploader.Controllers
                 var documentDto = _mapper.Map<DocumentDto>(model);
 
                 string filePath = await _documentAppService.UploadFile(documentDto, userEmail);
-                return Ok($"File uploaded successfully. FilePath: {filePath}");
+                return Ok($"File uploaded successfully.");
             }
             catch (Exception ex)
             {
