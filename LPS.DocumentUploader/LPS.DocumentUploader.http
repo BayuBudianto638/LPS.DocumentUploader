@@ -1,0 +1,6 @@
+@LPS.DocumentUploader_HostAddress = http://localhost:5226
+
+GET {{LPS.DocumentUploader_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
