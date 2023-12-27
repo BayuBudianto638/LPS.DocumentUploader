@@ -25,7 +25,7 @@ namespace LPS.DocumentUploader.Controllers
         [HttpPost("UploadFile")]
         [DisableRequestSizeLimit]
         [RequestFormLimits(ValueLengthLimit = int.MaxValue, MultipartBodyLengthLimit = long.MaxValue)]
-        [AllowAnonymous]
+        [Authorize]
         public async Task<IActionResult> UploadFile([FromForm] DocumentViewModel model, string userEmail)
         {
             try
